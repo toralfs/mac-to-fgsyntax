@@ -13,30 +13,34 @@ const outputpath string = "../../output/outputMacList.txt"
 
 func main() {
 
-	macList := readTextFile(inputpath)
-	macFGList := convertToFGsyntax(macList)
-	writeTextFile(outputpath, macFGList)
-	fmt.Println()
+	fmt.Println("Enter address group name that mac address objects should be added to:")
+	addrGrp := readUserInputSingle()
 
-	/*for _, l := range macFGList {
-		fmt.Println(l)
-	}
-	fmt.Println(appendList)*/
+	macList := readTextFile(inputpath)
+	macFGList := convertToFGsyntax(macList, addrGrp)
+
+	writeTextFile(outputpath, macFGList)
 }
 
-func convertToFGsyntax(macList []string) []string {
+func convertToFGsyntax(macList []string, addGrp string) []string {
 	var macFGList []string
 	appendList := "append member "
+	macFGList = append(macFGList, fmt.Sprintf("config firewall address"))
 	for _, mac := range macList {
 		mac = strings.TrimSpace(mac)
-		macFGList = append(macFGList, fmt.Sprintf("edit \"%s\"", mac))
-		macFGList = append(macFGList, fmt.Sprintf("set type mac"))
-		macFGList = append(macFGList, fmt.Sprintf("set start-mac %s", mac))
-		macFGList = append(macFGList, fmt.Sprintf("set end-mac %s", mac))
-		macFGList = append(macFGList, fmt.Sprintf("next"))
+		macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
+		macFGList = append(macFGList, fmt.Sprintf("        set type mac"))
+		macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
+		macFGList = append(macFGList, fmt.Sprintf("        set end-mac %s", mac))
+		macFGList = append(macFGList, fmt.Sprintf("    next"))
 		appendList = fmt.Sprintf("%s \"%s\"", appendList, mac)
 	}
-	macFGList = append(macFGList, fmt.Sprintf("\n%s", appendList))
+	macFGList = append(macFGList, fmt.Sprintf("end"))
+	macFGList = append(macFGList, fmt.Sprintf("\nconfig firewall addrgrp"))
+	macFGList = append(macFGList, fmt.Sprintf("    edit %s", addGrp))
+	macFGList = append(macFGList, fmt.Sprintf("        %s", appendList))
+	macFGList = append(macFGList, fmt.Sprintf("    next"))
+	macFGList = append(macFGList, fmt.Sprintf("end"))
 	return macFGList
 }
 
@@ -79,4 +83,14 @@ func writeTextFile(path string, text []string) {
 			log.Fatal(err)
 		}
 	}
+}
+
+func readUserInputSingle() string {
+	s := bufio.NewScanner(os.Stdin)
+	s.Scan()
+	ln := s.Text()
+	if err := s.Err(); err != nil {
+		log.Fatal(err)
+	}
+	return ln
 }
