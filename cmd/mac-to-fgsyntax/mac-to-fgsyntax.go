@@ -27,7 +27,7 @@ func convertToFGsyntax(macList []string, addGrp string) []string {
 	appendList := "append member "
 	macFGList = append(macFGList, fmt.Sprintf("config firewall address"))
 	for _, mac := range macList {
-		mac = strings.TrimSpace(mac)
+		mac = strings.ToLower(strings.TrimSpace(mac))
 		macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
 		macFGList = append(macFGList, fmt.Sprintf("        set type mac"))
 		macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
