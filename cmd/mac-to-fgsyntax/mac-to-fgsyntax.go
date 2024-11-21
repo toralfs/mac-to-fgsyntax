@@ -37,7 +37,7 @@ func convertToFGsyntax(macList []string, addGrp string) []string {
 	}
 	macFGList = append(macFGList, fmt.Sprintf("end"))
 	macFGList = append(macFGList, fmt.Sprintf("\nconfig firewall addrgrp"))
-	macFGList = append(macFGList, fmt.Sprintf("    edit %s", addGrp))
+	macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", addGrp))
 	macFGList = append(macFGList, fmt.Sprintf("        %s", appendList))
 	macFGList = append(macFGList, fmt.Sprintf("    next"))
 	macFGList = append(macFGList, fmt.Sprintf("end"))
