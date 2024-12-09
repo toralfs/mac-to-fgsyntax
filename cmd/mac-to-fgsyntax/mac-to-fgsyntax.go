@@ -2,45 +2,173 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"text/template"
+	"time"
 )
 
-const inputpath string = "../../input/inputMacList.txt"
-const outputpath string = "../../output/outputMacList.txt"
+var tpl *template.Template
+var convertedFiles = sync.Map{}
+
+func init() {
+	tpl = template.Must(template.ParseGlob("templates/*"))
+}
 
 func main() {
+	port := flag.String("p", "8080", "server port")
+	flag.Parse()
 
-	fmt.Println("Enter address group name that mac address objects should be added to:")
-	addrGrp := readUserInputSingle()
+	http.HandleFunc("/", index)
+	http.HandleFunc("/mac-to-fgsyntax", macFGsyntax)
+	http.HandleFunc("/mac-to-fgsyntax/upload", uploadFile)
+	http.HandleFunc("/mac-to-fgsyntax/download", downloadFile)
+	http.Handle("/favicon.ico", http.NotFoundHandler())
 
-	macList := readTextFile(inputpath)
-	macFGList := convertToFGsyntax(macList, addrGrp)
+	log.Printf("Serving on HTTP port: %s\n", *port)
+	log.Fatal(http.ListenAndServe(":"+*port, nil))
+}
 
-	writeTextFile(outputpath, macFGList)
+func index(w http.ResponseWriter, r *http.Request) {
+	tpl.ExecuteTemplate(w, "index.gohtml", nil)
+}
+
+func macFGsyntax(w http.ResponseWriter, r *http.Request) {
+	tpl.ExecuteTemplate(w, "mac-to-fgsyntax.gohtml", nil)
+}
+
+func uploadFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form
+	err := r.ParseMultipartForm(10 << 20) // 10 MB limt
+	if err != nil {
+		http.Error(w, "Error parsing form", http.StatusBadRequest)
+		return
+	}
+
+	// retrieve address group name from form
+	addrGrp := r.FormValue("addrGrp")
+	if addrGrp == "" {
+		http.Error(w, "Address group name is required", http.StatusBadRequest)
+		return
+	}
+
+	// retrieve the file from form data
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Temporary file in tmp folder
+	tempFile, err := os.CreateTemp("tmp", "upload-*.txt")
+	if err != nil {
+		http.Error(w, "Error creating temporary file", http.StatusInternalServerError)
+		return
+	}
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempFile.Name())
+	}()
+
+	// Copy uploaded file content to temp file
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		http.Error(w, "Error writing to temporary file", http.StatusInternalServerError)
+		return
+	}
+
+	inTempFileName := tempFile.Name()
+	outTempFileName := doConversion(inTempFileName, addrGrp)
+
+	// Generate uuid for converted file
+	uuid := fmt.Sprintf("%d", time.Now().UnixNano())
+	convertedFiles.Store(uuid, outTempFileName)
+
+	http.Redirect(w, r, "/mac-to-fgsyntax/download?fileID="+uuid, http.StatusSeeOther)
+}
+
+func downloadFile(w http.ResponseWriter, r *http.Request) {
+	// get file uuid from query
+	fileID := r.URL.Query().Get("fileID")
+	if fileID == "" {
+		http.Error(w, "Missing file ID", http.StatusBadRequest)
+		return
+	}
+
+	// retrieve file from uuid map
+	value, ok := convertedFiles.Load(fileID)
+	if !ok {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	filePath := value.(string)
+
+	// Open file
+	file, err := os.Open(filePath)
+	if err != nil {
+		http.Error(w, "Converted file not found", http.StatusInternalServerError)
+		return
+	}
+	defer func() {
+		file.Close()
+		os.Remove(filePath)
+		convertedFiles.Delete(fileID)
+	}()
+
+	// Get file info
+	fileInfo, err := file.Stat()
+	if err != nil {
+		http.Error(w, "Could not get file info", http.StatusInternalServerError)
+		return
+	}
+
+	// Set headers to prompt download
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileInfo.Name()))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+
+	// serve file
+	file.Seek(0, io.SeekStart)
+	io.Copy(w, file)
+}
+
+func doConversion(inFileName string, addrGrpName string) string {
+	macList := readTextFile(inFileName)
+	macFGList := convertToFGsyntax(macList, addrGrpName)
+	return writeTextFile("tmp", macFGList)
 }
 
 func convertToFGsyntax(macList []string, addGrp string) []string {
 	var macFGList []string
 	appendList := "append member "
-	macFGList = append(macFGList, fmt.Sprintf("config firewall address"))
+	macFGList = append(macFGList, "config firewall address")
 	for _, mac := range macList {
 		mac = strings.ToLower(strings.TrimSpace(mac))
 		macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
-		macFGList = append(macFGList, fmt.Sprintf("        set type mac"))
+		macFGList = append(macFGList, "        set type mac")
 		macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
 		macFGList = append(macFGList, fmt.Sprintf("        set end-mac %s", mac))
-		macFGList = append(macFGList, fmt.Sprintf("    next"))
+		macFGList = append(macFGList, "    next")
 		appendList = fmt.Sprintf("%s \"%s\"", appendList, mac)
 	}
-	macFGList = append(macFGList, fmt.Sprintf("end"))
-	macFGList = append(macFGList, fmt.Sprintf("\nconfig firewall addrgrp"))
+	macFGList = append(macFGList, "end")
+	macFGList = append(macFGList, "\nconfig firewall addrgrp")
 	macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", addGrp))
 	macFGList = append(macFGList, fmt.Sprintf("        %s", appendList))
-	macFGList = append(macFGList, fmt.Sprintf("    next"))
-	macFGList = append(macFGList, fmt.Sprintf("end"))
+	macFGList = append(macFGList, "    next")
+	macFGList = append(macFGList, "end")
 	return macFGList
 }
 
@@ -66,8 +194,8 @@ func readTextFile(path string) []string {
 	return fileContent
 }
 
-func writeTextFile(path string, text []string) {
-	f, err := os.Create(path)
+func writeTextFile(path string, text []string) string {
+	f, err := os.CreateTemp(path, "converted-*.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,14 +211,6 @@ func writeTextFile(path string, text []string) {
 			log.Fatal(err)
 		}
 	}
-}
 
-func readUserInputSingle() string {
-	s := bufio.NewScanner(os.Stdin)
-	s.Scan()
-	ln := s.Text()
-	if err := s.Err(); err != nil {
-		log.Fatal(err)
-	}
-	return ln
+	return f.Name()
 }
