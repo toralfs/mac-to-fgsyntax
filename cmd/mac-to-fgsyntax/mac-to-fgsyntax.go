@@ -71,24 +71,24 @@ func selectMethod() int {
 func convertToFGsyntax(macList []string, addGrp string) []string {
 	var macFGList []string
 	appendList := "append member "
-	macFGList = append(macFGList, fmt.Sprintf("config firewall address"))
+	macFGList = append(macFGList, "config firewall address")
 	for _, mac := range macList {
 		if validateMac(mac) {
 			mac = strings.ToLower(strings.TrimSpace(mac))
 			macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
-			macFGList = append(macFGList, fmt.Sprintf("        set type mac"))
+			macFGList = append(macFGList, "        set type mac")
 			macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
 			macFGList = append(macFGList, fmt.Sprintf("        set end-mac %s", mac))
-			macFGList = append(macFGList, fmt.Sprintf("    next"))
+			macFGList = append(macFGList, "    next")
 			appendList = fmt.Sprintf("%s \"%s\"", appendList, mac)
 		}
 	}
-	macFGList = append(macFGList, fmt.Sprintf("end"))
-	macFGList = append(macFGList, fmt.Sprintf("\nconfig firewall addrgrp"))
+	macFGList = append(macFGList, "end")
+	macFGList = append(macFGList, "\nconfig firewall addrgrp")
 	macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", addGrp))
 	macFGList = append(macFGList, fmt.Sprintf("        %s", appendList))
-	macFGList = append(macFGList, fmt.Sprintf("    next"))
-	macFGList = append(macFGList, fmt.Sprintf("end"))
+	macFGList = append(macFGList, "    next")
+	macFGList = append(macFGList, "end")
 	return macFGList
 }
 
