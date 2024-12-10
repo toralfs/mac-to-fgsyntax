@@ -42,16 +42,16 @@ func main() {
 				fmt.Println(l)
 			}
 			fmt.Printf("\nPress any button to exit\n")
-			readUserInput()
+			readUserInputSingle()
 			os.Exit(0)
 		case 2: // file in/out method
 			macList := readTextFile(inputpath)
 			macFGList := convertToFGsyntax(macList, addrGrp)
 
 			writeTextFile(outputpath, macFGList)
-			fmt.Printf("List converted to FortiGate syntax and writting to %s\n", outputpath)
+			fmt.Printf("List converted to FortiGate syntax and written to %s\n", outputpath)
 			fmt.Printf("\nPress any button to exit\n")
-			readUserInput()
+			readUserInputSingle()
 			os.Exit(0)
 		default:
 			fmt.Printf("Invalid choice, try again..\n\n")
