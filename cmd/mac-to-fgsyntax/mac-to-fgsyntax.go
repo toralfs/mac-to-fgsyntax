@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"text/template"
@@ -155,13 +156,15 @@ func convertToFGsyntax(macList []string, addGrp string) []string {
 	appendList := "append member "
 	macFGList = append(macFGList, "config firewall address")
 	for _, mac := range macList {
-		mac = strings.ToLower(strings.TrimSpace(mac))
-		macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
-		macFGList = append(macFGList, "        set type mac")
-		macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
-		macFGList = append(macFGList, fmt.Sprintf("        set end-mac %s", mac))
-		macFGList = append(macFGList, "    next")
-		appendList = fmt.Sprintf("%s \"%s\"", appendList, mac)
+		if validateMac(mac) {
+			mac = strings.ToLower(strings.TrimSpace(mac))
+			macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
+			macFGList = append(macFGList, "        set type mac")
+			macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
+			macFGList = append(macFGList, fmt.Sprintf("        set end-mac %s", mac))
+			macFGList = append(macFGList, "    next")
+			appendList = fmt.Sprintf("%s \"%s\"", appendList, mac)
+		}
 	}
 	macFGList = append(macFGList, "end")
 	macFGList = append(macFGList, "\nconfig firewall addrgrp")
@@ -170,6 +173,15 @@ func convertToFGsyntax(macList []string, addGrp string) []string {
 	macFGList = append(macFGList, "    next")
 	macFGList = append(macFGList, "end")
 	return macFGList
+}
+
+func validateMac(mac string) bool {
+	reMac := regexp.MustCompile("^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$")
+	if match := reMac.FindStringSubmatch(mac); match != nil {
+		return true
+	} else {
+		return false
+	}
 }
 
 func readTextFile(path string) []string {
