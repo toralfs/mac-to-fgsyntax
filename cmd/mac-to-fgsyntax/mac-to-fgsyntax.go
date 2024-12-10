@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,11 +16,13 @@ import (
 	"time"
 )
 
+const path string = "tmp"
+
 var tpl *template.Template
 var convertedFiles = sync.Map{}
 
 func init() {
-	tpl = template.Must(template.ParseGlob("templates/*"))
+	tpl = template.Must(template.ParseGlob("../../templates/*"))
 }
 
 func main() {
@@ -72,8 +75,14 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Temporary file in tmp folder
-	tempFile, err := os.CreateTemp("tmp", "upload-*.txt")
+	// Create temporary file in tmp folder, but first check if tmp folder eixsts and create if not.
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		err := os.MkdirAll(path, os.ModePerm)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	tempFile, err := os.CreateTemp(path, "upload-*.txt")
 	if err != nil {
 		http.Error(w, "Error creating temporary file", http.StatusInternalServerError)
 		return
