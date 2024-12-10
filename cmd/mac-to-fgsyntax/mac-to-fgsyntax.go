@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -124,6 +126,13 @@ func readTextFile(path string) []string {
 }
 
 func writeTextFile(path string, text []string) {
+	dir := filepath.Dir(path)
+	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		err := os.MkdirAll(dir, os.ModePerm)
+		if err != nil {
+			log.Println(err)
+		}
+	}
 	f, err := os.Create(path)
 	if err != nil {
 		log.Fatal(err)
