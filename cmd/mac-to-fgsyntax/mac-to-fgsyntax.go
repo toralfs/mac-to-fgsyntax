@@ -5,21 +5,67 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
-const inputpath string = "../../input/inputMacList.txt"
-const outputpath string = "../../output/outputMacList.txt"
+const inputpath string = "input/inputMacList.txt"
+const outputpath string = "output/outputMacList.txt"
 
 func main() {
+	// Welcome message
+	fmt.Printf("------------------------------------------------------------------------------\n")
+	fmt.Printf("---------------- MAC address to FortiGate syntax converter -------------------\n")
+	fmt.Printf("------------------------------------------------------------------------------\n")
+	fmt.Printf("Program expects a list of mac addresses with one mac address on each line\n")
+	fmt.Printf("Expected mac address format is: xx:xx:xx:xx:xx:xx\n\n\n")
 
+	// First get address group name, common for both methods.
 	fmt.Println("Enter address group name that mac address objects should be added to:")
 	addrGrp := readUserInputSingle()
 
-	macList := readTextFile(inputpath)
-	macFGList := convertToFGsyntax(macList, addrGrp)
+	// Select usage method
+	for {
+		usrChoice := selectMethod()
+		switch usrChoice {
+		case 1: // cli in/out method
+			fmt.Printf("Enter the list of mac addresses and then press CTRL+D or CTRL+Z (depending on OS):\n")
+			macList := readUserInput()
+			macFGList := convertToFGsyntax(macList, addrGrp)
 
-	writeTextFile(outputpath, macFGList)
+			fmt.Printf("\nList converted to Fortigate Syntax: \n")
+			fmt.Printf("--------------------------------------\n")
+			for _, l := range macFGList {
+				fmt.Println(l)
+			}
+			fmt.Printf("\nExiting...\n")
+			os.Exit(0)
+		case 2: // file in/out method
+			macList := readTextFile(inputpath)
+			macFGList := convertToFGsyntax(macList, addrGrp)
+
+			writeTextFile(outputpath, macFGList)
+			fmt.Printf("List converted to FortiGate syntax and writting to %s\n", outputpath)
+			fmt.Printf("\nExiting...\n")
+			os.Exit(0)
+		default:
+			fmt.Printf("Invalid choice, try again..\n\n")
+		}
+	}
+}
+
+func selectMethod() int {
+	fmt.Println("Select usage method:")
+	fmt.Println("1: command line input/output")
+	fmt.Println("2: input/output files")
+
+	choice, err := strconv.Atoi(readUserInputSingle())
+	if err != nil {
+		fmt.Println("Invalid input, needs to be a number.")
+		return -1
+	}
+	return choice
 }
 
 func convertToFGsyntax(macList []string, addGrp string) []string {
@@ -27,13 +73,15 @@ func convertToFGsyntax(macList []string, addGrp string) []string {
 	appendList := "append member "
 	macFGList = append(macFGList, fmt.Sprintf("config firewall address"))
 	for _, mac := range macList {
-		mac = strings.ToLower(strings.TrimSpace(mac))
-		macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
-		macFGList = append(macFGList, fmt.Sprintf("        set type mac"))
-		macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
-		macFGList = append(macFGList, fmt.Sprintf("        set end-mac %s", mac))
-		macFGList = append(macFGList, fmt.Sprintf("    next"))
-		appendList = fmt.Sprintf("%s \"%s\"", appendList, mac)
+		if validateMac(mac) {
+			mac = strings.ToLower(strings.TrimSpace(mac))
+			macFGList = append(macFGList, fmt.Sprintf("    edit \"%s\"", mac))
+			macFGList = append(macFGList, fmt.Sprintf("        set type mac"))
+			macFGList = append(macFGList, fmt.Sprintf("        set start-mac %s", mac))
+			macFGList = append(macFGList, fmt.Sprintf("        set end-mac %s", mac))
+			macFGList = append(macFGList, fmt.Sprintf("    next"))
+			appendList = fmt.Sprintf("%s \"%s\"", appendList, mac)
+		}
 	}
 	macFGList = append(macFGList, fmt.Sprintf("end"))
 	macFGList = append(macFGList, fmt.Sprintf("\nconfig firewall addrgrp"))
@@ -42,6 +90,15 @@ func convertToFGsyntax(macList []string, addGrp string) []string {
 	macFGList = append(macFGList, fmt.Sprintf("    next"))
 	macFGList = append(macFGList, fmt.Sprintf("end"))
 	return macFGList
+}
+
+func validateMac(mac string) bool {
+	reMac := regexp.MustCompile("^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$")
+	if match := reMac.FindStringSubmatch(mac); match != nil {
+		return true
+	} else {
+		return false
+	}
 }
 
 func readTextFile(path string) []string {
@@ -83,6 +140,25 @@ func writeTextFile(path string, text []string) {
 			log.Fatal(err)
 		}
 	}
+}
+
+func readUserInput() []string {
+	s := bufio.NewScanner(os.Stdin)
+
+	var lines []string
+	for {
+		if !s.Scan() {
+			break
+		}
+		lines = append(lines, s.Text())
+	}
+
+	err := s.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return lines
 }
 
 func readUserInputSingle() string {

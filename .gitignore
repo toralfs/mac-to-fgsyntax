@@ -26,3 +26,9 @@ bin/
 # input/output folders
 input/
 output/
+
+# temp folder
+tmp/
+
+# vscode folder
+.vscode
