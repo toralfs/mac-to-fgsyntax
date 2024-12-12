@@ -12,8 +12,9 @@ import (
 	"strings"
 )
 
-const inPathEnv string = "MACFGSYNTAX_IN"
-const outPathEnv string = "MACFGSYNTAX_OUT"
+const assetsPathEnv string = "GO_ASSETS"
+const fileIn = "mac-to-fgsyntax/in.txt"
+const fileOut = "mac-to-fgsyntax/out.txt"
 
 func main() {
 	// Welcome message
@@ -48,16 +49,21 @@ func main() {
 			readUserInputSingle()
 			os.Exit(0)
 		case 2: // file in/out method
-			inputpath, outputpath, err := setFilePaths()
+			// Init file path
+			assetsPath, err := initEnv(assetsPathEnv)
 			if err != nil {
-				fmt.Println(err)
+				fmt.Println(err, "\nExiting program...")
+				os.Exit(0)
 			}
-			userMacInput := readTextFile(inputpath)
+			fullPath := filepath.Join(assetsPath, fileIn)
+
+			// read input file, parse and write output file.
+			userMacInput := readTextFile(fullPath)
 			macList := parseUserInput(userMacInput)
 			macFGList := convertToFGsyntax(macList, addrGrp)
 
-			writeTextFile(outputpath, macFGList)
-			fmt.Printf("List converted to FortiGate syntax and written to %s\n", outputpath)
+			writeTextFile(fullPath, macFGList)
+			fmt.Printf("List converted to FortiGate syntax and written to %s\n", fullPath)
 			fmt.Printf("\nPress any button to exit\n")
 			readUserInputSingle()
 			os.Exit(0)
@@ -67,17 +73,13 @@ func main() {
 	}
 }
 
-func setFilePaths() (string, string, error) {
-	inputpath := os.Getenv(inPathEnv)
-	outputpath := os.Getenv(outPathEnv)
+func initEnv(envName string) (string, error) {
+	env := os.Getenv(assetsPathEnv)
 	var err error = nil
-
-	if inputpath == "" || outputpath == "" {
-		inputpath = "../input/inputMacList.txt"
-		outputpath = "../output/outputMacList.txt"
-		err = fmt.Errorf("path environment variables not set, using fallback relative paths:\n %s\n %s", inputpath, outputpath)
+	if env == "" {
+		err = fmt.Errorf("Environment variable: \"%s\" is not set.", envName)
 	}
-	return inputpath, outputpath, err
+	return env, err
 }
 
 func parseUserInput(userInput []string) []net.HardwareAddr {
