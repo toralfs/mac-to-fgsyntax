@@ -55,15 +55,16 @@ func main() {
 				fmt.Println(err, "\nExiting program...")
 				os.Exit(0)
 			}
-			fullPath := filepath.Join(assetsPath, fileIn)
+			fullInPath := filepath.Join(assetsPath, fileIn)
+			fullOutPath := filepath.Join(assetsPath, fileOut)
 
 			// read input file, parse and write output file.
-			userMacInput := readTextFile(fullPath)
+			userMacInput := readTextFile(fullInPath)
 			macList := parseUserInput(userMacInput)
 			macFGList := convertToFGsyntax(macList, addrGrp)
 
-			writeTextFile(fullPath, macFGList)
-			fmt.Printf("List converted to FortiGate syntax and written to %s\n", fullPath)
+			writeTextFile(fullOutPath, macFGList)
+			fmt.Printf("List converted to FortiGate syntax and written to %s\n", fullOutPath)
 			fmt.Printf("\nPress any button to exit\n")
 			readUserInputSingle()
 			os.Exit(0)
@@ -77,7 +78,7 @@ func initEnv(envName string) (string, error) {
 	env := os.Getenv(assetsPathEnv)
 	var err error = nil
 	if env == "" {
-		err = fmt.Errorf("Environment variable: \"%s\" is not set.", envName)
+		err = fmt.Errorf("environment variable: \"%s\" is not set", envName)
 	}
 	return env, err
 }
