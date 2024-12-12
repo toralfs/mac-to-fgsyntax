@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-const inputpath string = "../input/inputMacList.txt"
-const outputpath string = "../output/outputMacList.txt"
+const inPathEnv string = "MACFGSYNTAX_IN"
+const outPathEnv string = "MACFGSYNTAX_OUT"
 
 func main() {
 	// Welcome message
@@ -48,6 +48,10 @@ func main() {
 			readUserInputSingle()
 			os.Exit(0)
 		case 2: // file in/out method
+			inputpath, outputpath, err := setFilePaths()
+			if err != nil {
+				fmt.Println(err)
+			}
 			userMacInput := readTextFile(inputpath)
 			macList := parseUserInput(userMacInput)
 			macFGList := convertToFGsyntax(macList, addrGrp)
@@ -61,6 +65,19 @@ func main() {
 			fmt.Printf("Invalid choice, try again..\n\n")
 		}
 	}
+}
+
+func setFilePaths() (string, string, error) {
+	inputpath := os.Getenv(inPathEnv)
+	outputpath := os.Getenv(outPathEnv)
+	var err error = nil
+
+	if inputpath == "" || outputpath == "" {
+		inputpath = "../input/inputMacList.txt"
+		outputpath = "../output/outputMacList.txt"
+		err = fmt.Errorf("path environment variables not set, using fallback relative paths:\n %s\n %s", inputpath, outputpath)
+	}
+	return inputpath, outputpath, err
 }
 
 func parseUserInput(userInput []string) []net.HardwareAddr {
